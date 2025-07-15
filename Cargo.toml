@@ -1,0 +1,14 @@
+[package]
+name = "emlite"
+version = "0.1.28"
+edition = "2024"
+description = "A Rust wrapper around emlite"
+homepage = "https://github.com/emlite/emlite-rs"
+repository = "https://github.com/emlite/emlite-rs"
+keywords = ["wasm", "wasi", "polyfill", "shim", "bindings"]
+categories = ["api-bindings", "wasm"]
+license = "MIT"
+readme = "README.md"
+
+[build-dependencies]
+cmk = "0.1"
