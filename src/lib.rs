@@ -361,6 +361,12 @@ impl From<&String> for Val {
     }
 }
 
+impl From<&Val> for Val {
+    fn from(v: &Val) -> Self {
+        v.clone()
+    }
+}
+
 impl Drop for Val {
     fn drop(&mut self) {
         unsafe { emlite_val_dec_ref(self.as_handle()) }
@@ -466,6 +472,11 @@ impl Not for Val {
     fn not(self) -> Self::Output {
         unsafe { emlite_val_not(self.as_handle()) }
     }
+}
+
+impl AsRef<Val> for Val {
+    #[inline]
+    fn as_ref(&self) -> &Val { self }
 }
 
 pub trait FromVal: Sized {
