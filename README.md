@@ -265,11 +265,7 @@ You just need to load the emscripten code after emlite:
     <title>Document</title>
 </head>
 <body>
-    <script type="module">
-        import { Emlite } from "./src/emlite.js";
-        const emlite = new Emlite();
-    </script>
-    <script async src="./bin/mywasms.js"></script>
+    <script src="./bin/mywasms.js"></script>
 </body>
 </html>
 ```
@@ -285,10 +281,8 @@ If you pass the `-sMODULARIZE=1 -sEXPORT_ES6=1` flags to emscripten, you will ha
 </head>
 <body>
     <script type="module">
-        import { Emlite } from "./src/emlite.js";
         import initModule from "./bin/mywasm.js";
         window.onload = async () => {
-            const emlite = new Emlite();
             const mymain = await initModule();
         };
     </script>

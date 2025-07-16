@@ -1,7 +1,8 @@
 fn main() {
+    println!("cargo:rerun-if-changed=ems_env/main.c");
+    println!("cargo:rerun-if-changed=ems_env/CMakeLists.txt");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os == "emscripten" {
-        println!("cargo:rerun-if-changed=ems_env");
         const TOOLCHAIN_SUBPATH: &str = "cmake/Modules/Platform/Emscripten.cmake";
         let mut emscripten_root =
             std::path::PathBuf::from(std::env::var("EMSCRIPTEN_ROOT").unwrap_or_default());
