@@ -302,7 +302,7 @@ EM_JS(void, emlite_print_object_map_impl, (), {
 EM_JS(void, emlite_reset_object_map_impl, (), {
     if (!globalThis.EMLITE_INITIALIZED) emlite_init_handle_table();
     for (const h of[... EMLITE_VALMAP._h2e.keys()]) {
-        if (h > 4) {
+        if (h > 5) {
             const value = EMLITE_VALMAP._h2e.get(h).value;
 
             EMLITE_VALMAP._h2e.delete(h);
@@ -318,7 +318,7 @@ EM_JS(void, emlite_val_inc_ref_impl, (Handle h), {
 
 EM_JS(void, emlite_val_dec_ref_impl, (Handle h), {
     if (!globalThis.EMLITE_INITIALIZED) emlite_init_handle_table();
-    if (h > 4) EMLITE_VALMAP.decRef(h);
+    if (h > 5) EMLITE_VALMAP.decRef(h);
 });
 // clang-format on
 EMLITE_USED
