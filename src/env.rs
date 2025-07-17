@@ -3,7 +3,7 @@
 #[unsafe(no_mangle)]
 #[unsafe(export_name = "emlite_target")]
 pub extern "C" fn emlite_target() -> i32 {
-    1024
+    1027
 }
 
 use core::ffi::{c_char, c_double, c_int, c_void};
