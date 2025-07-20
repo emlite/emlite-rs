@@ -6,6 +6,13 @@ pub extern "C" fn emlite_target() -> i32 {
     1027
 }
 
+#[unsafe(no_mangle)]
+#[unsafe(export_name = "emlite_malloc")]
+pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
+    unsafe extern "C" { fn malloc(_: usize) -> *mut core::ffi::c_void; }
+    unsafe { malloc(sz) }
+}
+
 use core::ffi::{c_char, c_double, c_int, c_void};
 pub type Handle = u32;
 
