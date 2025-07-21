@@ -9,8 +9,10 @@ pub extern "C" fn emlite_target() -> i32 {
 #[unsafe(no_mangle)]
 #[unsafe(export_name = "emlite_malloc")]
 pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
-    unsafe extern "C" { fn malloc(_: usize) -> *mut core::ffi::c_void; }
-    unsafe { malloc(sz) }
+    use core::alloc::{Layout};
+    let size = core::cmp::max(sz, 1);
+    let layout = Layout::from_size_align(size, 1).unwrap();
+    unsafe { alloc::alloc::alloc(layout) as _ }
 }
 
 use core::ffi::{c_char, c_double, c_int, c_void};
