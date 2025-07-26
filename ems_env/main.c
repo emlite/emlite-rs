@@ -175,7 +175,9 @@ EM_JS(double, emlite_val_get_value_double_impl, (Handle n), {
 
 EM_JS(char *, emlite_val_get_value_string_impl, (Handle n), {
     if (!globalThis.EMLITE_INITIALIZED) emlite_init_handle_table();
-    const str = EMLITE_VALMAP.get(n) + "\0";
+    const val = EMLITE_VALMAP.get(n);
+    if (!val || typeof val !== 'string') return 0;
+    const str = val + "\0";
     const len = Module.lengthBytesUTF8(str);
     const buf = _malloc(len);
     stringToUTF8(str, buf, len);

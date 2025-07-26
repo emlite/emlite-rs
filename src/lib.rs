@@ -110,7 +110,11 @@ impl Val {
     pub fn type_of(&self) -> String {
         unsafe {
             let ptr = emlite_val_typeof(self.as_handle());
-            String::from_utf8_lossy(CStr::from_ptr(ptr).to_bytes()).to_string()
+            if ptr.is_null() {
+                String::from("undefined")
+            } else {
+                String::from_utf8_lossy(CStr::from_ptr(ptr).to_bytes()).to_string()
+            }
         }
     }
 
@@ -558,17 +562,25 @@ macro_rules! impl_float {
 
 impl_float!(f32, f64);
 
-impl FromVal for String {
+impl FromVal for Option<String> {
     fn from_val(v: &Val) -> Self {
         unsafe {
             let ptr = emlite_val_get_value_string(v.as_handle());
-            CStr::from_ptr(ptr).to_string_lossy().into_owned()
+            if ptr.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+            }
         }
     }
     fn take_ownership(v: Handle) -> Self {
         unsafe {
             let ptr = emlite_val_get_value_string(v);
-            CStr::from_ptr(ptr).to_string_lossy().into_owned()
+            if ptr.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+            }
         }
     }
     fn as_handle(&self) -> Handle {
@@ -577,17 +589,25 @@ impl FromVal for String {
 }
 
 
-impl FromVal for &str {
+impl FromVal for Option<&str> {
     fn from_val(v: &Val) -> Self {
         unsafe {
             let ptr = emlite_val_get_value_string(v.as_handle());
-            CStr::from_ptr(ptr).to_str().unwrap()
+            if ptr.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(ptr).to_str().unwrap())
+            }
         }
     }
     fn take_ownership(v: Handle) -> Self {
         unsafe {
             let ptr = emlite_val_get_value_string(v);
-            CStr::from_ptr(ptr).to_str().unwrap()
+            if ptr.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(ptr).to_str().unwrap())
+            }
         }
     }
     fn as_handle(&self) -> Handle {
