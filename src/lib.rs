@@ -483,6 +483,11 @@ impl AsRef<Val> for Val {
     fn as_ref(&self) -> &Val { self }
 }
 
+impl AsMut<Val> for Val {
+    #[inline]
+    fn as_mut(&mut self) -> &mut Val { self }
+}
+
 pub trait FromVal: Sized {
     /// Creates a Val object from another
     fn from_val(v: &Val) -> Self;
