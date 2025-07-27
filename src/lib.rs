@@ -515,6 +515,34 @@ impl FromVal for Val {
     }
 }
 
+impl FromVal for Result<Val, Val> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            emlite_val_inc_ref(v.inner);
+        }
+        if v.is_error() {
+            Err(v.clone())
+        } else {
+            Ok(v.clone())
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        let temp = Val::take_ownership(v);
+        if temp.is_error() {
+            Err(temp)
+        } else {
+            Ok(temp)
+        }
+    }
+    #[inline(always)]
+    fn as_handle(&self) -> Handle {
+        match self {
+            Ok(ok) => ok.as_handle(),
+            Err(e) => e.as_handle(),
+        }
+    }
+}
+
 impl FromVal for bool {
     fn from_val(v: &Val) -> Self {
         unsafe {
@@ -526,6 +554,32 @@ impl FromVal for bool {
     }
     fn as_handle(&self) -> Handle {
         if *self { EmlitePredefHandles::False as u32 } else { EmlitePredefHandles::True as u32 }
+    }
+}
+
+impl FromVal for Result<bool, Val> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            if v.is_error() {
+                Err(v.clone())
+            } else {
+                Ok(!env::emlite_val_not(v.as_handle()))
+            }
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        let temp = Val::take_ownership(v);
+        if temp.is_error() {
+            Err(temp)
+        } else {
+            unsafe { Ok(!env::emlite_val_not(v)) }
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        match self {
+            Ok(ok) => if *ok { EmlitePredefHandles::False as u32 } else { EmlitePredefHandles::True as u32 },
+            Err(e) => e.as_handle(),
+        }
     }
 }
 
@@ -544,6 +598,28 @@ macro_rules! impl_int {
                 0
             }
         }
+        impl FromVal for Result<$t, Val> {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    if v.is_error() {
+                        Err(v.clone())
+                    } else {
+                        Ok(emlite_val_get_value_int(v.as_handle()) as $t)
+                    }
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                let temp = Val::take_ownership(v);
+                if temp.is_error() {
+                    Err(temp)
+                } else {
+                    unsafe { Ok(emlite_val_get_value_int(v) as $t) }
+                }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
     )*}
 }
 
@@ -557,6 +633,28 @@ macro_rules! impl_float {
             }
             fn take_ownership(v: Handle) -> Self {
                 unsafe { emlite_val_get_value_double(v) as Self }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+        impl FromVal for Result<$t, Val> {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    if v.is_error() {
+                        Err(v.clone())
+                    } else {
+                        Ok(emlite_val_get_value_double(v.as_handle()) as $t)
+                    }
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                let temp = Val::take_ownership(v);
+                if temp.is_error() {
+                    Err(temp)
+                } else {
+                    unsafe { Ok(emlite_val_get_value_double(v) as $t) }
+                }
             }
             fn as_handle(&self) -> Handle {
                 0
@@ -612,6 +710,78 @@ impl FromVal for Option<&str> {
                 None
             } else {
                 Some(CStr::from_ptr(ptr).to_str().unwrap())
+            }
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        0
+    }
+}
+
+
+impl FromVal for Result<String, Val> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            if v.is_error() {
+                Err(v.clone())
+            } else {
+                let ptr = emlite_val_get_value_string(v.as_handle());
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null string".into()]))
+                } else {
+                    Ok(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+                }
+            }
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        unsafe {
+            let temp = Val::take_ownership(v);
+            if temp.is_error() {
+                Err(temp)
+            } else {
+                let ptr = emlite_val_get_value_string(v);
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null string".into()]))
+                } else {
+                    Ok(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+                }
+            }
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        0
+    }
+}
+
+
+impl FromVal for Result<&str, Val> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            if v.is_error() {
+                Err(v.clone())
+            } else {
+                let ptr = emlite_val_get_value_string(v.as_handle());
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null string".into()]))
+                } else {
+                    Ok(CStr::from_ptr(ptr).to_str().unwrap())
+                }
+            }
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        unsafe {
+            let temp = Val::take_ownership(v);
+            if temp.is_error() {
+                Err(temp)
+            } else {
+                let ptr = emlite_val_get_value_string(v);
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null string".into()]))
+                } else {
+                    Ok(CStr::from_ptr(ptr).to_str().unwrap())
+                }
             }
         }
     }
