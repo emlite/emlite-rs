@@ -15,7 +15,7 @@ pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
     unsafe { alloc::alloc::alloc(layout) as _ }
 }
 
-use core::ffi::{c_char, c_double, c_int, c_void};
+use core::ffi::{c_char, c_double, c_int, c_uint, c_void, c_longlong, c_ulonglong};
 pub type Handle = u32;
 
 unsafe extern "C" {
@@ -30,10 +30,16 @@ unsafe extern "C" {
     pub fn emlite_val_push(arr: Handle, v: Handle);
 
     pub fn emlite_val_make_int(t: c_int) -> Handle;
+    pub fn emlite_val_make_uint(t: c_uint) -> Handle;
+    pub fn emlite_val_make_bigint(t: c_longlong) -> Handle;
+    pub fn emlite_val_make_biguint(t: c_ulonglong) -> Handle;
     pub fn emlite_val_make_double(t: c_double) -> Handle;
     pub fn emlite_val_make_str(s: *const c_char, len: usize) -> Handle;
 
     pub fn emlite_val_get_value_int(val: Handle) -> c_int;
+    pub fn emlite_val_get_value_uint(val: Handle) -> c_int;
+    pub fn emlite_val_get_value_bigint(val: Handle) -> c_longlong;
+    pub fn emlite_val_get_value_biguint(val: Handle) -> c_ulonglong;
     pub fn emlite_val_get_value_double(val: Handle) -> c_double;
     pub fn emlite_val_get_value_string(val: Handle) -> *mut c_char;
 

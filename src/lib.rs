@@ -301,31 +301,31 @@ impl From<i32> for Val {
 
 impl From<u32> for Val {
     fn from(v: u32) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_uint(v as _) })
     }
 }
 
 impl From<i64> for Val {
     fn from(v: i64) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_bigint(v as _) })
     }
 }
 
 impl From<u64> for Val {
     fn from(v: u64) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_biguint(v as _) })
     }
 }
 
 impl From<usize> for Val {
     fn from(v: usize) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_biguint(v as _) })
     }
 }
 
 impl From<isize> for Val {
     fn from(v: isize) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_bigint(v as _) })
     }
 }
 
@@ -623,7 +623,130 @@ macro_rules! impl_int {
     )*}
 }
 
-impl_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+macro_rules! impl_uint {
+    ($($t:ty),*) => {$(
+        impl FromVal for $t {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    emlite_val_get_value_uint(v.as_handle()) as Self
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                unsafe { emlite_val_get_value_uint(v) as Self }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+        impl FromVal for Result<$t, Val> {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    if v.is_error() {
+                        Err(v.clone())
+                    } else {
+                        Ok(emlite_val_get_value_uint(v.as_handle()) as $t)
+                    }
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                let temp = Val::take_ownership(v);
+                if temp.is_error() {
+                    Err(temp)
+                } else {
+                    unsafe { Ok(emlite_val_get_value_uint(v) as $t) }
+                }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+    )*}
+}
+
+macro_rules! impl_bigint {
+    ($($t:ty),*) => {$(
+        impl FromVal for $t {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    emlite_val_get_value_bigint(v.as_handle()) as Self
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                unsafe { emlite_val_get_value_bigint(v) as Self }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+        impl FromVal for Result<$t, Val> {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    if v.is_error() {
+                        Err(v.clone())
+                    } else {
+                        Ok(emlite_val_get_value_bigint(v.as_handle()) as $t)
+                    }
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                let temp = Val::take_ownership(v);
+                if temp.is_error() {
+                    Err(temp)
+                } else {
+                    unsafe { Ok(emlite_val_get_value_bigint(v) as $t) }
+                }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+    )*}
+}
+
+macro_rules! impl_biguint {
+    ($($t:ty),*) => {$(
+        impl FromVal for $t {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    emlite_val_get_value_biguint(v.as_handle()) as Self
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                unsafe { emlite_val_get_value_biguint(v) as Self }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+        impl FromVal for Result<$t, Val> {
+            fn from_val(v: &Val) -> Self {
+                unsafe {
+                    if v.is_error() {
+                        Err(v.clone())
+                    } else {
+                        Ok(emlite_val_get_value_biguint(v.as_handle()) as $t)
+                    }
+                }
+            }
+            fn take_ownership(v: Handle) -> Self {
+                let temp = Val::take_ownership(v);
+                if temp.is_error() {
+                    Err(temp)
+                } else {
+                    unsafe { Ok(emlite_val_get_value_biguint(v) as $t) }
+                }
+            }
+            fn as_handle(&self) -> Handle {
+                0
+            }
+        }
+    )*}
+}
+
+impl_int!(i8, i16, i32);
+impl_uint!(u8, u16, u32);
+impl_bigint!(i64, isize);
+impl_biguint!(u64, usize);
 
 macro_rules! impl_float {
     ($($t:ty),*) => {$(
