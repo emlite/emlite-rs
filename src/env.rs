@@ -3,7 +3,7 @@
 #[unsafe(no_mangle)]
 #[unsafe(export_name = "emlite_target")]
 pub extern "C" fn emlite_target() -> i32 {
-    1030
+    1031
 }
 
 #[unsafe(no_mangle)]
