@@ -29,6 +29,7 @@ unsafe extern "C" {
 
     pub fn emlite_val_push(arr: Handle, v: Handle);
 
+    pub fn emlite_val_make_bool(t: bool) -> Handle;
     pub fn emlite_val_make_int(t: c_int) -> Handle;
     pub fn emlite_val_make_uint(t: c_uint) -> Handle;
     pub fn emlite_val_make_bigint(t: c_longlong) -> Handle;
@@ -36,6 +37,7 @@ unsafe extern "C" {
     pub fn emlite_val_make_double(t: c_double) -> Handle;
     pub fn emlite_val_make_str(s: *const c_char, len: usize) -> Handle;
 
+    pub fn emlite_val_get_value_bool(val: Handle) -> bool;
     pub fn emlite_val_get_value_int(val: Handle) -> c_int;
     pub fn emlite_val_get_value_uint(val: Handle) -> c_int;
     pub fn emlite_val_get_value_bigint(val: Handle) -> c_longlong;
@@ -49,6 +51,7 @@ unsafe extern "C" {
 
     pub fn emlite_val_is_string(val: Handle) -> bool;
     pub fn emlite_val_is_number(val: Handle) -> bool;
+    pub fn emlite_val_is_bool(val: Handle) -> bool;
     pub fn emlite_val_not(val: Handle) -> bool;
     pub fn emlite_val_gt(arg1: Handle, arg2: Handle) -> bool;
     pub fn emlite_val_gte(arg1: Handle, arg2: Handle) -> bool;

@@ -233,6 +233,10 @@ impl Val {
     pub fn is_number(&self) -> bool {
         unsafe { emlite_val_is_number(self.as_handle()) }
     }
+
+    pub fn is_bool(&self) -> bool {
+        unsafe { emlite_val_is_bool(self.as_handle()) }
+    }
     
     pub fn is_string(&self) -> bool {
         unsafe { emlite_val_is_string(self.as_handle()) }
@@ -265,7 +269,7 @@ impl Val {
 
 impl From<bool> for Val {
     fn from(v: bool) -> Self {
-        Val::take_ownership(unsafe { emlite_val_make_int(v as _) })
+        Val::take_ownership(unsafe { emlite_val_make_bool(v as _) })
     }
 }
 
