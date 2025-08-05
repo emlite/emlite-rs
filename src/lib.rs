@@ -265,6 +265,37 @@ impl Val {
     {
         T::from_val(self)
     }
+
+    /// Creates a Val from UTF-16 data
+    pub fn from_utf16(utf16: &[u16]) -> Val {
+        Val::from(utf16)
+    }
+
+    /// Extracts UTF-16 data as Option<Vec<u16>>
+    pub fn to_utf16(&self) -> Option<Vec<u16>> {
+        self.as_::<Option<Vec<u16>>>()
+    }
+
+    /// Extracts UTF-16 data, returning error if null or if self is error
+    pub fn to_utf16_result(&self) -> Result<Vec<u16>, Val> {
+        self.as_::<Result<Vec<u16>, Val>>()
+    }
+
+    /// Converts UTF-16 Vec<u16> to String, if possible
+    pub fn utf16_to_string(utf16: &[u16]) -> Result<String, ()> {
+        // Simple conversion that works for basic cases
+        // For a full implementation, you'd want proper UTF-16 decoding
+        match String::from_utf16(utf16) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(()),
+        }
+    }
+
+    /// Creates a Val from a String by first converting to UTF-16
+    pub fn from_string_via_utf16(s: &str) -> Val {
+        let utf16: Vec<u16> = s.encode_utf16().collect();
+        Val::from_utf16(&utf16)
+    }
 }
 
 impl From<bool> for Val {
@@ -366,6 +397,24 @@ impl From<String> for Val {
 impl From<&String> for Val {
     fn from(s: &String) -> Self {
         Val::take_ownership(unsafe { emlite_val_make_str(s.as_ptr() as _, s.len()) })
+    }
+}
+
+impl From<&[u16]> for Val {
+    fn from(s: &[u16]) -> Self {
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
+    }
+}
+
+impl From<Vec<u16>> for Val {
+    fn from(s: Vec<u16>) -> Self {
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
+    }
+}
+
+impl From<&Vec<u16>> for Val {
+    fn from(s: &Vec<u16>) -> Self {
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
     }
 }
 
@@ -908,6 +957,103 @@ impl FromVal for Result<&str, Val> {
                     Err(Val::global("Error").new(&["Null string".into()]))
                 } else {
                     Ok(CStr::from_ptr(ptr).to_str().unwrap())
+                }
+            }
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        0
+    }
+}
+
+impl FromVal for Option<Vec<u16>> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            let ptr = emlite_val_get_value_string_utf16(v.as_handle());
+            if ptr.is_null() {
+                None
+            } else {
+                // Find length by searching for null terminator
+                let mut len = 0;
+                let mut current = ptr;
+                while *current != 0 {
+                    len += 1;
+                    current = current.add(1);
+                }
+                // Convert to Vec<u16>
+                let slice = core::slice::from_raw_parts(ptr, len);
+                Some(slice.to_vec())
+            }
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        unsafe {
+            let ptr = emlite_val_get_value_string_utf16(v);
+            if ptr.is_null() {
+                None
+            } else {
+                // Find length by searching for null terminator
+                let mut len = 0;
+                let mut current = ptr;
+                while *current != 0 {
+                    len += 1;
+                    current = current.add(1);
+                }
+                // Convert to Vec<u16>
+                let slice = core::slice::from_raw_parts(ptr, len);
+                Some(slice.to_vec())
+            }
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        0
+    }
+}
+
+impl FromVal for Result<Vec<u16>, Val> {
+    fn from_val(v: &Val) -> Self {
+        unsafe {
+            if v.is_error() {
+                Err(v.clone())
+            } else {
+                let ptr = emlite_val_get_value_string_utf16(v.as_handle());
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null UTF-16 string".into()]))
+                } else {
+                    // Find length by searching for null terminator
+                    let mut len = 0;
+                    let mut current = ptr;
+                    while *current != 0 {
+                        len += 1;
+                        current = current.add(1);
+                    }
+                    // Convert to Vec<u16>
+                    let slice = core::slice::from_raw_parts(ptr, len);
+                    Ok(slice.to_vec())
+                }
+            }
+        }
+    }
+    fn take_ownership(v: Handle) -> Self {
+        unsafe {
+            let temp = Val::take_ownership(v);
+            if temp.is_error() {
+                Err(temp)
+            } else {
+                let ptr = emlite_val_get_value_string_utf16(v);
+                if ptr.is_null() {
+                    Err(Val::global("Error").new(&["Null UTF-16 string".into()]))
+                } else {
+                    // Find length by searching for null terminator
+                    let mut len = 0;
+                    let mut current = ptr;
+                    while *current != 0 {
+                        len += 1;
+                        current = current.add(1);
+                    }
+                    // Convert to Vec<u16>
+                    let slice = core::slice::from_raw_parts(ptr, len);
+                    Ok(slice.to_vec())
                 }
             }
         }
