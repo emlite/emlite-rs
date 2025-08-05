@@ -1,6 +1,7 @@
 use emlite::*;
 
 fn main() {
+    emlite::init();
     #[allow(non_snake_case)]
     let mut AudioContext = Val::global("AudioContext");
     if !AudioContext.as_::<bool>() {

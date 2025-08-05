@@ -1,6 +1,7 @@
 use emlite::*;
 
 fn main() {
+    emlite::init();
     let document = Val::global("document");
     let elem = document.call("createElement", &argv!["BUTTON"]);
     elem.set("textContent", Val::from("Click"));

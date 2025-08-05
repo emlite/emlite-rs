@@ -1,6 +1,7 @@
 use emlite::{Console, eval};
 
 fn main() {
+    emlite::init();
     let con = Console::get();
     let ret = eval!(
         r#"

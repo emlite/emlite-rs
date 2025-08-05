@@ -13,6 +13,7 @@ Then you can import and use the Val wrapper and its associated methods:
 use emlite::{argv, Console};
 
 fn main() {
+    emlite::init();
     let con = Console::get();
     con.log(&argv!["Hello from Emlite!"]);
 }
@@ -22,6 +23,7 @@ fn main() {
 use emlite::*;
 
 fn main() {
+    emlite::init();
     let document = Val::global("document");
     let elem = document.call("createElement", &argv!["BUTTON"]);
     elem.set("textContent", Val::from("Click"));
@@ -51,6 +53,7 @@ fn main() {
 use emlite::*;
 
 fn main() {
+    emlite::init();
     #[allow(non_snake_case)]
     let mut AudioContext = Val::global("AudioContext");
     if !AudioContext.as_::<bool>() {

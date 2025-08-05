@@ -64,6 +64,7 @@ impl From<MyJsClass> for Val {
 }
 
 fn main() {
+    emlite::init();
     MyJsClass::define();
     let c = MyJsClass::new(5, 6);
     c.call("print", &[]);
