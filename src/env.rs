@@ -19,6 +19,7 @@ use core::ffi::{c_char, c_double, c_int, c_uint, c_void, c_longlong, c_ulonglong
 pub type Handle = u32;
 
 unsafe extern "C" {
+    pub fn emlite_init_handle_table();
     pub fn emlite_val_new_array() -> Handle;
     pub fn emlite_val_new_object() -> Handle;
 

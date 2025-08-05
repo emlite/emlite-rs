@@ -42,6 +42,12 @@ macro_rules! argv {
     }};
 }
 
+pub fn init() {
+    unsafe {
+        emlite_init_handle_table();
+    }
+}
+
 /// A wrapper around a javascript handle
 #[derive(Debug)]
 pub struct Val {
