@@ -1068,3 +1068,40 @@ impl FromVal for Result<Vec<u16>, Val> {
         0
     }
 }
+
+/// A marker trait for types that can be constructed from JavaScript error values.
+/// This allows Result<T, E> implementations where E: FromJsError.
+pub trait FromJsError {
+    fn from_js_error(val: &Val) -> Self;
+}
+
+/// Implementation for Result<T, E> where T: FromVal and E: FromJsError.
+/// This allows clean conversion using as_::<Result<T, E>>() for JavaScript error handling.
+impl<T, E> FromVal for Result<T, E>
+where
+    T: FromVal,
+    E: FromJsError,
+{
+    fn from_val(v: &Val) -> Self {
+        if v.is_error() {
+            Err(E::from_js_error(v))
+        } else {
+            Ok(T::from_val(v))
+        }
+    }
+    fn take_ownership(handle: Handle) -> Self {
+        let temp = Val::take_ownership(handle);
+        if temp.is_error() {
+            Err(E::from_js_error(&temp))
+        } else {
+            Ok(T::take_ownership(handle))
+        }
+    }
+    fn as_handle(&self) -> Handle {
+        match self {
+            Ok(ok) => ok.as_handle(),
+            Err(_) => 0, // Errors don't have meaningful handles in this context
+        }
+    }
+}
+
