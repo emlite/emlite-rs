@@ -847,6 +847,19 @@ macro_rules! impl_float {
 
 impl_float!(f32, f64);
 
+impl FromVal for () {
+    fn from_val(_v: &Val) -> Self {
+        // Unit type doesn't carry any data, so we just return ()
+        ()
+    }
+    fn take_ownership(_v: Handle) -> Self {
+        ()
+    }
+    fn as_handle(&self) -> Handle {
+        EmlitePredefHandles::Undefined as u32
+    }
+}
+
 impl FromVal for Option<String> {
     fn from_val(v: &Val) -> Self {
         unsafe {
