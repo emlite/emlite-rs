@@ -500,7 +500,7 @@ impl DerefMut for Console {
 
 impl From<Console> for Val {
     fn from(val: Console) -> Self {
-        Val::take_ownership(val.inner)
+        Val::take_ownership(val.as_handle())
     }
 }
 
@@ -612,7 +612,7 @@ impl FromVal for bool {
         Self::from_val(&Val::take_ownership(v))
     }
     fn as_handle(&self) -> Handle {
-        if *self { EmlitePredefHandles::False as u32 } else { EmlitePredefHandles::True as u32 }
+        if *self { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 }
     }
 }
 
@@ -637,8 +637,8 @@ impl FromVal for Option<bool> {
     }
     fn as_handle(&self) -> Handle {
         match self {
-            Some(ok) => if *ok { EmlitePredefHandles::False as u32 } else { EmlitePredefHandles::True as u32 },
-            None => EmlitePredefHandles::False as u32,
+            Some(ok) => if *ok { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 },
+            None => EmlitePredefHandles::Undefined as u32,
         }
     }
 }
@@ -663,7 +663,7 @@ impl FromVal for Result<bool, Val> {
     }
     fn as_handle(&self) -> Handle {
         match self {
-            Ok(ok) => if *ok { EmlitePredefHandles::False as u32 } else { EmlitePredefHandles::True as u32 },
+            Ok(ok) => if *ok { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 },
             Err(e) => e.as_handle(),
         }
     }
