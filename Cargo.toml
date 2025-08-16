@@ -1,6 +1,6 @@
 [package]
 name = "emlite"
-version = "0.1.42"
+version = "0.1.43"
 edition = "2024"
 description = "A Rust wrapper around emlite"
 homepage = "https://github.com/emlite/emlite-rs"
