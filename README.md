@@ -255,7 +255,7 @@ emlite-rs supports emscripten's default mode when it outputs js glue code. This 
 The most convenient way to pass extra flags to the toolchain is via a .cargo/config.toml file:
 ```toml
 [target.wasm32-unknown-emscripten]
-rustflags = ["-Clink-args=-sERROR_ON_UNDEFINED_SYMBOLS=0 -sALLOW_MEMORY_GROWTH=1 -sEXPORTED_RUNTIME_METHODS=wasmTable,UTF8ToString,lengthBytesUTF8,stringToUTF8 -sEXPORTED_FUNCTIONS=_malloc,_main -Wl,--strip-all"]
+rustflags = ["-Clink-args=-sERROR_ON_UNDEFINED_SYMBOLS=0 -sALLOW_MEMORY_GROWTH=1 -sEXPORTED_FUNCTIONS=_main -Wl,--strip-all,--export-dynamic"]
 ```
 
 You just need to load the emscripten code after emlite:

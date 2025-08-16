@@ -31,6 +31,11 @@ typedef Handle (*Callback)(Handle, Handle data);
     _EM_JS(ret, name, name, params, #__VA_ARGS__)
 
 
+#define EM_JS_DEPS(tag, deps)                                                                      \
+    __attribute__((used)) __attribute__((section("em_lib_deps")))                                  \
+    __attribute__((aligned(1))) char __em_lib_deps_##tag[] = deps;
+
+EM_JS_DEPS(emlite, "$wasmTable,$UTF8ToString,$UTF16ToString,$lengthBytesUTF8,$lengthBytesUTF16,$stringToUTF8,$stringToUTF16");
 
 // clang-format off
 EM_JS(void, emlite_init_handle_table_impl, (), {
