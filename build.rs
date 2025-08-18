@@ -1,6 +1,6 @@
 fn main() {
-    println!("cargo:rerun-if-changed=ems_env/main.c");
-    println!("cargo:rerun-if-changed=ems_env/CMakeLists.txt");
+    println!("cargo:rerun-if-changed=emlite_emscripten_adapter/lib.c");
+    println!("cargo:rerun-if-changed=emlite_emscripten_adapter/CMakeLists.txt");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os == "emscripten" {
         const TOOLCHAIN_SUBPATH: &str = "cmake/Modules/Platform/Emscripten.cmake";
@@ -13,7 +13,7 @@ fn main() {
             .join("upstream/emscripten");
         }
         let toolchain_file = emscripten_root.join(TOOLCHAIN_SUBPATH);
-        let dst = cmk::Config::new("ems_env")
+        let dst = cmk::Config::new("emlite_emscripten_adapter")
             .define("CMAKE_TOOLCHAIN_FILE", toolchain_file)
             .profile("Release")
             .build();
