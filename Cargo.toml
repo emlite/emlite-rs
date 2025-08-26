@@ -10,5 +10,8 @@ categories = ["api-bindings", "wasm"]
 license = "MIT"
 readme = "README.md"
 
+[target.wasm32-wasip2.dependencies]
+wit-bindgen = "0.44"  
+
 [build-dependencies]
 cmk = "0.1"

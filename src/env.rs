@@ -1,4 +1,5 @@
 #![allow(unused)]
+use crate::common::Handle;
 
 #[unsafe(no_mangle)]
 #[unsafe(export_name = "emlite_target")]
@@ -16,7 +17,6 @@ pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
 }
 
 use core::ffi::{c_char, c_double, c_int, c_uint, c_void, c_longlong, c_ulonglong};
-pub type Handle = u32;
 
 unsafe extern "C" {
     pub fn emlite_init_handle_table();

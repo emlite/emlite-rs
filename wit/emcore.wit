@@ -1,0 +1,6 @@
+package emlite:core@0.1.0;
+
+world env {
+    import emlite:env/host@0.1.0;
+    export emlite:env/dyncall@0.1.0;
+}
