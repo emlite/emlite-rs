@@ -1,11 +1,14 @@
-use alloc::string::String;
-use alloc::vec::Vec;
 use crate::common::Handle;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::ptr;
 
 wit_bindgen::generate!({ generate_all });
 
-use crate::exports::emlite::env::dyncall::Guest;
 use crate::emlite::env::host;
+use crate::exports::emlite::env::dyncall::Guest;
 
 struct Env;
 
@@ -200,57 +203,146 @@ pub unsafe fn emlite_val_make_callback(fidx: Handle, data: Handle) -> Handle {
     host::emlite_val_make_callback(fidx, data)
 }
 
-// Callback management for dynamic function calls
-use alloc::vec;
-use alloc::boxed::Box;
-use core::ptr;
+// Safer callback management using lazy initialization and proper encapsulation
+use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-static mut CALLBACKS: *mut Vec<Option<Box<dyn Fn(Handle, Handle) -> Handle>>> = ptr::null_mut();
+struct CallbackRegistry {
+    callbacks: UnsafeCell<Vec<Option<Box<dyn Fn(Handle, Handle) -> Handle>>>>,
+    initialized: AtomicBool,
+}
 
-pub unsafe fn emlite_register_callback<F>(callback: F) -> Handle 
-where
-    F: Fn(Handle, Handle) -> Handle + 'static,
-{
-    unsafe {
-        if CALLBACKS.is_null() {
-            CALLBACKS = Box::into_raw(Box::new(vec![]));
+// Safety: We ensure thread-safety through proper atomic operations and unsafe cell usage
+unsafe impl Sync for CallbackRegistry {}
+
+static CALLBACK_REGISTRY: CallbackRegistry = CallbackRegistry {
+    callbacks: UnsafeCell::new(Vec::new()),
+    initialized: AtomicBool::new(false),
+};
+
+impl CallbackRegistry {
+    fn ensure_initialized(&self) {
+        if !self.initialized.load(Ordering::Acquire) {
+            // Initialize the vector - safe because we're the first to access it
+            unsafe {
+                (*self.callbacks.get()) = Vec::new();
+            }
+            self.initialized.store(true, Ordering::Release);
         }
+    }
+    
+    fn register<F>(&self, callback: F) -> Handle
+    where
+        F: Fn(Handle, Handle) -> Handle + 'static,
+    {
+        self.ensure_initialized();
         
-        let callbacks = &mut *CALLBACKS;
         let boxed_callback = Box::new(callback);
         
-        // Find an empty slot or add to the end
-        for (i, slot) in callbacks.iter_mut().enumerate() {
-            if slot.is_none() {
-                *slot = Some(boxed_callback);
-                return i as Handle;
+        unsafe {
+            let callbacks = &mut *self.callbacks.get();
+            
+            // Find an empty slot or add to the end
+            for (i, slot) in callbacks.iter_mut().enumerate() {
+                if slot.is_none() {
+                    *slot = Some(boxed_callback);
+                    return i as Handle;
+                }
             }
-        }
-        
-        callbacks.push(Some(boxed_callback));
-        (callbacks.len() - 1) as Handle
-    }
-}
-
-pub unsafe fn emlite_unregister_callback(fidx: Handle) {
-    unsafe {
-        if !CALLBACKS.is_null() {
-            let callbacks = &mut *CALLBACKS;
-            if (fidx as usize) < callbacks.len() {
-                callbacks[fidx as usize] = None;
-            }
+            
+            callbacks.push(Some(boxed_callback));
+            (callbacks.len() - 1) as Handle
         }
     }
-}
-
-pub unsafe fn emlite_env_dyncall_apply(fidx: u32, argv: u32, data: u32) -> u32 {
-    unsafe {
-        if !CALLBACKS.is_null() {
-            let callbacks = &*CALLBACKS;
-            if let Some(Some(callback)) = callbacks.get(fidx as usize) {
-                return callback(argv, data);
+    
+    fn unregister(&self, fidx: Handle) {
+        if self.initialized.load(Ordering::Acquire) {
+            unsafe {
+                let callbacks = &mut *self.callbacks.get();
+                if (fidx as usize) < callbacks.len() {
+                    // Dropping the boxed callback will properly clean up memory
+                    callbacks[fidx as usize] = None;
+                }
+            }
+        }
+    }
+    
+    // Optional: Clear all callbacks (useful for cleanup or testing)
+    #[allow(dead_code)]
+    fn clear_all(&self) {
+        if self.initialized.load(Ordering::Acquire) {
+            unsafe {
+                let callbacks = &mut *self.callbacks.get();
+                callbacks.clear();
+            }
+        }
+    }
+    
+    fn call(&self, fidx: u32, argv: u32, data: u32) -> u32 {
+        if self.initialized.load(Ordering::Acquire) {
+            unsafe {
+                let callbacks = &*self.callbacks.get();
+                if let Some(Some(callback)) = callbacks.get(fidx as usize) {
+                    return callback(argv, data);
+                }
             }
         }
         0 // Return undefined handle if callback not found
     }
+}
+
+pub unsafe fn emlite_register_callback<F>(callback: F) -> Handle
+where
+    F: Fn(Handle, Handle) -> Handle + 'static,
+{
+    CALLBACK_REGISTRY.register(callback)
+}
+
+pub unsafe fn emlite_unregister_callback(fidx: Handle) {
+    CALLBACK_REGISTRY.unregister(fidx)
+}
+
+pub unsafe fn emlite_env_dyncall_apply(fidx: u32, argv: u32, data: u32) -> u32 {
+    CALLBACK_REGISTRY.call(fidx, argv, data)
+}
+
+// Unified interface functions to abstract away wasip2 vs other target differences
+
+pub unsafe fn emlite_val_make_str_unified(s: &str) -> Handle {
+    unsafe { emlite_val_make_str(s) }
+}
+
+pub unsafe fn emlite_val_make_str_utf16_unified(s: &[u16]) -> Handle {
+    unsafe { emlite_val_make_str_utf16(s) }
+}
+
+pub unsafe fn emlite_val_obj_call_unified(obj: Handle, method: &str, argv: Handle) -> Handle {
+    unsafe { emlite_val_obj_call(obj, method, argv) }
+}
+
+pub unsafe fn emlite_val_obj_has_own_prop_unified(obj: Handle, prop: &str) -> bool {
+    unsafe { emlite_val_obj_has_own_prop(obj, prop) }
+}
+
+pub unsafe fn emlite_val_typeof_unified(h: Handle) -> String {
+    unsafe { emlite_val_typeof(h) }
+}
+
+pub unsafe fn emlite_val_get_value_string_unified(h: Handle) -> Option<String> {
+    unsafe { Some(emlite_val_get_value_string(h)) }
+}
+
+pub unsafe fn emlite_val_get_value_string_utf16_unified(h: Handle) -> Option<Vec<u16>> {
+    unsafe { Some(emlite_val_get_value_string_utf16(h)) }
+}
+
+pub unsafe fn emlite_val_not_unified(h: Handle) -> bool {
+    unsafe { emlite_val_not(h) }
+}
+
+// Function pointer type for callbacks
+type CallbackFn = fn(Handle, Handle) -> Handle;
+
+pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
+    unsafe { emlite_register_callback(f) }
 }

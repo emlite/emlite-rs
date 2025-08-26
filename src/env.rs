@@ -10,13 +10,13 @@ pub extern "C" fn emlite_target() -> i32 {
 #[unsafe(no_mangle)]
 #[unsafe(export_name = "emlite_malloc")]
 pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
-    use core::alloc::{Layout};
+    use core::alloc::Layout;
     let size = core::cmp::max(sz, 1);
     let layout = Layout::from_size_align(size, 1).unwrap();
     unsafe { alloc::alloc::alloc(layout) as _ }
 }
 
-use core::ffi::{c_char, c_double, c_int, c_uint, c_void, c_longlong, c_ulonglong};
+use core::ffi::{c_char, c_double, c_int, c_longlong, c_uint, c_ulonglong, c_void};
 
 unsafe extern "C" {
     pub fn emlite_init_handle_table();
@@ -81,4 +81,79 @@ unsafe extern "C" {
     pub fn emlite_print_object_map();
 
     pub fn emlite_reset_object_map();
+}
+
+// Unified interface functions to abstract away wasip2 vs other target differences
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::ffi::CStr;
+
+pub unsafe fn emlite_val_make_str_unified(s: &str) -> Handle {
+    unsafe { emlite_val_make_str(s.as_ptr() as _, s.len()) }
+}
+
+pub unsafe fn emlite_val_make_str_utf16_unified(s: &[u16]) -> Handle {
+    unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) }
+}
+
+pub unsafe fn emlite_val_obj_call_unified(obj: Handle, method: &str, argv: Handle) -> Handle {
+    unsafe { emlite_val_obj_call(obj, method.as_ptr() as _, method.len(), argv) }
+}
+
+pub unsafe fn emlite_val_obj_has_own_prop_unified(obj: Handle, prop: &str) -> bool {
+    unsafe { emlite_val_obj_has_own_prop(obj, prop.as_ptr() as _, prop.len()) }
+}
+
+pub unsafe fn emlite_val_typeof_unified(h: Handle) -> String {
+    unsafe {
+        let ptr = emlite_val_typeof(h);
+        if ptr.is_null() {
+            String::from("undefined")
+        } else {
+            String::from_utf8_lossy(CStr::from_ptr(ptr).to_bytes()).to_string()
+        }
+    }
+}
+
+pub unsafe fn emlite_val_get_value_string_unified(h: Handle) -> Option<String> {
+    unsafe {
+        let ptr = emlite_val_get_value_string(h);
+        if ptr.is_null() {
+            None
+        } else {
+            Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+        }
+    }
+}
+
+pub unsafe fn emlite_val_get_value_string_utf16_unified(h: Handle) -> Option<Vec<u16>> {
+    unsafe {
+        let ptr = emlite_val_get_value_string_utf16(h);
+        if ptr.is_null() {
+            None
+        } else {
+            // Find length by searching for null terminator
+            let mut len = 0;
+            let mut current = ptr;
+            while *current != 0 {
+                len += 1;
+                current = current.add(1);
+            }
+            // Convert to Vec<u16>
+            let slice = core::slice::from_raw_parts(ptr, len);
+            Some(slice.to_vec())
+        }
+    }
+}
+
+pub unsafe fn emlite_val_not_unified(h: Handle) -> bool {
+    unsafe { emlite_val_not(h) }
+}
+
+// Function pointer type for callbacks
+type CallbackFn = fn(Handle, Handle) -> Handle;
+
+pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
+    // For non-wasip2 targets, we use the function pointer directly as the index
+    f as usize as Handle
 }

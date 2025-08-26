@@ -16,12 +16,12 @@ pub mod wasip2env;
 use crate::wasip2env::*;
 
 use crate::common::Handle;
-use core::ffi::CStr;
+use alloc::boxed::Box;
+use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::boxed::Box;
 use alloc::vec::Vec;
-use alloc::format;
+use core::ffi::CStr;
 
 #[repr(u32)]
 pub enum EmlitePredefHandles {
@@ -70,7 +70,9 @@ pub struct Val {
 impl Val {
     /// Returns the globalThis object
     pub const fn global_this() -> Val {
-        Val { inner: EmlitePredefHandles::GlobalThis as _ }
+        Val {
+            inner: EmlitePredefHandles::GlobalThis as _,
+        }
     }
 
     /// Gets the property `prop`
@@ -86,12 +88,16 @@ impl Val {
 
     /// Gets a js null Val
     pub const fn null() -> Val {
-        Val { inner: EmlitePredefHandles::Null as _ }
+        Val {
+            inner: EmlitePredefHandles::Null as _,
+        }
     }
 
     /// Gets a js undefined Val
     pub const fn undefined() -> Val {
-        Val { inner: EmlitePredefHandles::Undefined as _ }
+        Val {
+            inner: EmlitePredefHandles::Undefined as _,
+        }
     }
 
     /// Gets a new js object
@@ -122,29 +128,12 @@ impl Val {
 
     /// Checks whether a non-inherited property `prop` exists
     pub fn has_own_property(&self, prop: &str) -> bool {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        unsafe { emlite_val_obj_has_own_prop(self.as_handle(), prop) }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        unsafe { emlite_val_obj_has_own_prop(self.as_handle(), prop.as_ptr() as _, prop.len()) }
+        unsafe { emlite_val_obj_has_own_prop_unified(self.as_handle(), prop) }
     }
 
     /// Gets the typeof the underlying js object
     pub fn type_of(&self) -> String {
-        unsafe {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                emlite_val_typeof(self.as_handle())
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                let ptr = emlite_val_typeof(self.as_handle());
-                if ptr.is_null() {
-                    String::from("undefined")
-                } else {
-                    String::from_utf8_lossy(CStr::from_ptr(ptr).to_bytes()).to_string()
-                }
-            }
-        }
+        unsafe { emlite_val_typeof_unified(self.as_handle()) }
     }
 
     /// Gets the element at index `idx`. Assumes the underlying js type is indexable
@@ -169,23 +158,11 @@ impl Val {
             for arg in args {
                 emlite_val_push(arr.as_handle(), arg.as_handle());
             }
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                Val::take_ownership(emlite_val_obj_call(
-                    self.as_handle(),
-                    f,
-                    arr.as_handle(),
-                ))
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                Val::take_ownership(emlite_val_obj_call(
-                    self.as_handle(),
-                    f.as_ptr() as _,
-                    f.len(),
-                    arr.as_handle(),
-                ))
-            }
+            Val::take_ownership(emlite_val_obj_call_unified(
+                self.as_handle(),
+                f,
+                arr.as_handle(),
+            ))
         }
     }
 
@@ -213,7 +190,7 @@ impl Val {
 
     /// Creates js function from a function pointer and returns its handle wrapped in a Val object
     pub fn make_fn_raw(f: fn(Handle, Handle) -> Handle, data: Handle) -> Val {
-        let idx: u32 = f as usize as u32;
+        let idx = unsafe { emlite_register_callback_unified(f) };
         unsafe { Val::take_ownership(emlite_val_make_callback(idx, data)) }
     }
 
@@ -277,7 +254,7 @@ impl Val {
     pub fn is_bool(&self) -> bool {
         unsafe { emlite_val_is_bool(self.as_handle()) }
     }
-    
+
     pub fn is_string(&self) -> bool {
         unsafe { emlite_val_is_string(self.as_handle()) }
     }
@@ -424,79 +401,37 @@ impl From<()> for Val {
 
 impl From<&str> for Val {
     fn from(s: &str) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(s.as_ptr() as _, s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_unified(s) })
     }
 }
 
 impl From<String> for Val {
     fn from(s: String) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(&s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(s.as_ptr() as _, s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_unified(&s) })
     }
 }
 
 impl From<&String> for Val {
     fn from(s: &String) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str(s.as_ptr() as _, s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_unified(s) })
     }
 }
 
 impl From<&[u16]> for Val {
     fn from(s: &[u16]) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16_unified(s) })
     }
 }
 
 impl From<Vec<u16>> for Val {
     fn from(s: Vec<u16>) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(&s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16_unified(&s) })
     }
 }
 
 impl From<&Vec<u16>> for Val {
     fn from(s: &Vec<u16>) -> Self {
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(s) })
-        }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-        {
-            Val::take_ownership(unsafe { emlite_val_make_str_utf16(s.as_ptr(), s.len()) })
-        }
+        Val::take_ownership(unsafe { emlite_val_make_str_utf16_unified(s) })
     }
 }
 
@@ -615,12 +550,16 @@ impl Not for Val {
 
 impl AsRef<Val> for Val {
     #[inline]
-    fn as_ref(&self) -> &Val { self }
+    fn as_ref(&self) -> &Val {
+        self
+    }
 }
 
 impl AsMut<Val> for Val {
     #[inline]
-    fn as_mut(&mut self) -> &mut Val { self }
+    fn as_mut(&mut self) -> &mut Val {
+        self
+    }
 }
 
 pub trait FromVal: Sized {
@@ -663,11 +602,7 @@ impl FromVal for Result<Val, Val> {
     }
     fn take_ownership(v: Handle) -> Self {
         let temp = Val::take_ownership(v);
-        if temp.is_error() {
-            Err(temp)
-        } else {
-            Ok(temp)
-        }
+        if temp.is_error() { Err(temp) } else { Ok(temp) }
     }
     #[inline(always)]
     fn as_handle(&self) -> Handle {
@@ -680,25 +615,19 @@ impl FromVal for Result<Val, Val> {
 
 impl FromVal for bool {
     fn from_val(v: &Val) -> Self {
-        unsafe {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                !crate::wasip2env::emlite_val_not(v.as_handle())
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                !crate::env::emlite_val_not(v.as_handle())
-            }
-        }
+        unsafe { !emlite_val_not_unified(v.as_handle()) }
     }
     fn take_ownership(v: Handle) -> Self {
         Self::from_val(&Val::take_ownership(v))
     }
     fn as_handle(&self) -> Handle {
-        if *self { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 }
+        if *self {
+            EmlitePredefHandles::True as u32
+        } else {
+            EmlitePredefHandles::False as u32
+        }
     }
 }
-
 
 impl FromVal for Option<bool> {
     fn from_val(v: &Val) -> Self {
@@ -706,14 +635,7 @@ impl FromVal for Option<bool> {
             if v.is_error() || v.is_null() || v.is_undefined() {
                 None
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Some(!crate::wasip2env::emlite_val_not(v.as_handle()))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    Some(!crate::env::emlite_val_not(v.as_handle()))
-                }
+                Some(!emlite_val_not_unified(v.as_handle()))
             }
         }
     }
@@ -722,15 +644,18 @@ impl FromVal for Option<bool> {
         if temp.is_error() || temp.is_null() || temp.is_undefined() {
             None
         } else {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            unsafe { Some(!crate::wasip2env::emlite_val_not(v)) }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            unsafe { Some(!crate::env::emlite_val_not(v)) }
+            unsafe { Some(!emlite_val_not_unified(v)) }
         }
     }
     fn as_handle(&self) -> Handle {
         match self {
-            Some(ok) => if *ok { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 },
+            Some(ok) => {
+                if *ok {
+                    EmlitePredefHandles::True as u32
+                } else {
+                    EmlitePredefHandles::False as u32
+                }
+            }
             None => EmlitePredefHandles::Undefined as u32,
         }
     }
@@ -742,14 +667,7 @@ impl FromVal for Result<bool, Val> {
             if v.is_error() {
                 Err(v.clone())
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Ok(!crate::wasip2env::emlite_val_not(v.as_handle()))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    Ok(!crate::env::emlite_val_not(v.as_handle()))
-                }
+                Ok(!emlite_val_not_unified(v.as_handle()))
             }
         }
     }
@@ -758,15 +676,18 @@ impl FromVal for Result<bool, Val> {
         if temp.is_error() {
             Err(temp)
         } else {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            unsafe { Ok(!crate::wasip2env::emlite_val_not(v)) }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            unsafe { Ok(!crate::env::emlite_val_not(v)) }
+            unsafe { Ok(!emlite_val_not_unified(v)) }
         }
     }
     fn as_handle(&self) -> Handle {
         match self {
-            Ok(ok) => if *ok { EmlitePredefHandles::True as u32 } else { EmlitePredefHandles::False as u32 },
+            Ok(ok) => {
+                if *ok {
+                    EmlitePredefHandles::True as u32
+                } else {
+                    EmlitePredefHandles::False as u32
+                }
+            }
             Err(e) => e.as_handle(),
         }
     }
@@ -1106,19 +1027,7 @@ impl FromVal for Option<String> {
             if !v.is_string() {
                 return None;
             }
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                Some(emlite_val_get_value_string(v.as_handle()))
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                let ptr = emlite_val_get_value_string(v.as_handle());
-                if ptr.is_null() {
-                    None
-                } else {
-                    Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
-                }
-            }
+            emlite_val_get_value_string_unified(v.as_handle())
         }
     }
     fn take_ownership(v: Handle) -> Self {
@@ -1126,19 +1035,7 @@ impl FromVal for Option<String> {
             if !emlite_val_is_string(v) {
                 return None;
             }
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                Some(emlite_val_get_value_string(v))
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                let ptr = emlite_val_get_value_string(v);
-                if ptr.is_null() {
-                    None
-                } else {
-                    Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
-                }
-            }
+            emlite_val_get_value_string_unified(v)
         }
     }
     fn as_handle(&self) -> Handle {
@@ -1154,18 +1051,9 @@ impl FromVal for Result<String, Val> {
             } else if !v.is_string() {
                 Err(Val::global("Error").new(&["Expected string".into()]))
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Ok(emlite_val_get_value_string(v.as_handle()))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    let ptr = emlite_val_get_value_string(v.as_handle());
-                    if ptr.is_null() {
-                        Err(Val::global("Error").new(&["Null string".into()]))
-                    } else {
-                        Ok(CStr::from_ptr(ptr).to_string_lossy().into_owned())
-                    }
+                match emlite_val_get_value_string_unified(v.as_handle()) {
+                    Some(s) => Ok(s),
+                    None => Err(Val::global("Error").new(&["Null string".into()])),
                 }
             }
         }
@@ -1178,18 +1066,9 @@ impl FromVal for Result<String, Val> {
             } else if !temp.is_string() {
                 Err(Val::global("Error").new(&["Expected string".into()]))
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Ok(emlite_val_get_value_string(v))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    let ptr = emlite_val_get_value_string(v);
-                    if ptr.is_null() {
-                        Err(Val::global("Error").new(&["Null string".into()]))
-                    } else {
-                        Ok(CStr::from_ptr(ptr).to_string_lossy().into_owned())
-                    }
+                match emlite_val_get_value_string_unified(v) {
+                    Some(s) => Ok(s),
+                    None => Err(Val::global("Error").new(&["Null string".into()])),
                 }
             }
         }
@@ -1201,56 +1080,10 @@ impl FromVal for Result<String, Val> {
 
 impl FromVal for Option<Vec<u16>> {
     fn from_val(v: &Val) -> Self {
-        unsafe {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                Some(emlite_val_get_value_string_utf16(v.as_handle()))
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                let ptr = emlite_val_get_value_string_utf16(v.as_handle());
-                if ptr.is_null() {
-                    None
-                } else {
-                    // Find length by searching for null terminator
-                    let mut len = 0;
-                    let mut current = ptr;
-                    while *current != 0 {
-                        len += 1;
-                        current = current.add(1);
-                    }
-                    // Convert to Vec<u16>
-                    let slice = core::slice::from_raw_parts(ptr, len);
-                    Some(slice.to_vec())
-                }
-            }
-        }
+        unsafe { emlite_val_get_value_string_utf16_unified(v.as_handle()) }
     }
     fn take_ownership(v: Handle) -> Self {
-        unsafe {
-            #[cfg(all(target_os = "wasi", target_env = "p2"))]
-            {
-                Some(emlite_val_get_value_string_utf16(v))
-            }
-            #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-            {
-                let ptr = emlite_val_get_value_string_utf16(v);
-                if ptr.is_null() {
-                    None
-                } else {
-                    // Find length by searching for null terminator
-                    let mut len = 0;
-                    let mut current = ptr;
-                    while *current != 0 {
-                        len += 1;
-                        current = current.add(1);
-                    }
-                    // Convert to Vec<u16>
-                    let slice = core::slice::from_raw_parts(ptr, len);
-                    Some(slice.to_vec())
-                }
-            }
-        }
+        unsafe { emlite_val_get_value_string_utf16_unified(v) }
     }
     fn as_handle(&self) -> Handle {
         0
@@ -1263,27 +1096,9 @@ impl FromVal for Result<Vec<u16>, Val> {
             if v.is_error() {
                 Err(v.clone())
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Ok(emlite_val_get_value_string_utf16(v.as_handle()))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    let ptr = emlite_val_get_value_string_utf16(v.as_handle());
-                    if ptr.is_null() {
-                        Err(Val::global("Error").new(&["Null UTF-16 string".into()]))
-                    } else {
-                        // Find length by searching for null terminator
-                        let mut len = 0;
-                        let mut current = ptr;
-                        while *current != 0 {
-                            len += 1;
-                            current = current.add(1);
-                        }
-                        // Convert to Vec<u16>
-                        let slice = core::slice::from_raw_parts(ptr, len);
-                        Ok(slice.to_vec())
-                    }
+                match emlite_val_get_value_string_utf16_unified(v.as_handle()) {
+                    Some(vec) => Ok(vec),
+                    None => Err(Val::global("Error").new(&["Null UTF-16 string".into()])),
                 }
             }
         }
@@ -1294,27 +1109,9 @@ impl FromVal for Result<Vec<u16>, Val> {
             if temp.is_error() {
                 Err(temp)
             } else {
-                #[cfg(all(target_os = "wasi", target_env = "p2"))]
-                {
-                    Ok(emlite_val_get_value_string_utf16(v))
-                }
-                #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
-                {
-                    let ptr = emlite_val_get_value_string_utf16(v);
-                    if ptr.is_null() {
-                        Err(Val::global("Error").new(&["Null UTF-16 string".into()]))
-                    } else {
-                        // Find length by searching for null terminator
-                        let mut len = 0;
-                        let mut current = ptr;
-                        while *current != 0 {
-                            len += 1;
-                            current = current.add(1);
-                        }
-                        // Convert to Vec<u16>
-                        let slice = core::slice::from_raw_parts(ptr, len);
-                        Ok(slice.to_vec())
-                    }
+                match emlite_val_get_value_string_utf16_unified(v) {
+                    Some(vec) => Ok(vec),
+                    None => Err(Val::global("Error").new(&["Null UTF-16 string".into()])),
                 }
             }
         }
@@ -1359,4 +1156,3 @@ where
         }
     }
 }
-

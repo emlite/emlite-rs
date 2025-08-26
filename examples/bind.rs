@@ -1,4 +1,4 @@
-use emlite::{env::Handle, *};
+use emlite::{common::Handle, *};
 use std::ops::{Deref, DerefMut};
 
 struct MyJsClass {
