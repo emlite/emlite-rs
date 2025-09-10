@@ -110,6 +110,22 @@ impl Val {
         Val::take_ownership(unsafe { emlite_val_new_array() })
     }
 
+    /// Creates a JavaScript Array from a Rust slice by pushing elements.
+    /// Each element is converted via `Into<Val>` and appended using `Array.prototype.push`.
+    /// This mirrors how argument arrays are built elsewhere and ensures JS values (not handles)
+    /// are stored in the resulting array.
+    pub fn from_slice<T>(slice: &[T]) -> Val
+    where
+        T: Clone + Into<Val>,
+    {
+        let arr = Val::array();
+        for item in slice {
+            // Use method call so JS receives actual values, avoiding handle-lifetime issues
+            arr.call("push", &[item.clone().into()]);
+        }
+        arr
+    }
+
     /// Set the underlying js object property `prop` to `val`
     pub fn set<K: Into<Val>, V: Into<Val>>(&self, prop: K, val: V) {
         unsafe {
@@ -545,6 +561,14 @@ impl Not for Val {
 
     fn not(self) -> Self::Output {
         unsafe { emlite_val_not(self.as_handle()) }
+    }
+}
+
+impl core::ops::Not for &Val {
+    type Output = bool;
+
+    fn not(self) -> Self::Output {
+        unsafe { emlite_val_not_unified(self.as_handle()) }
     }
 }
 
