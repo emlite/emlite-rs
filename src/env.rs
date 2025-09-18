@@ -16,6 +16,8 @@ pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
     unsafe { alloc::alloc::alloc(layout) as _ }
 }
 
+use alloc::alloc::dealloc;
+use core::alloc::Layout;
 use core::ffi::{c_char, c_double, c_int, c_longlong, c_uint, c_ulonglong, c_void};
 
 unsafe extern "C" {
@@ -154,6 +156,5 @@ pub unsafe fn emlite_val_not_unified(h: Handle) -> bool {
 type CallbackFn = fn(Handle, Handle) -> Handle;
 
 pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
-    // For non-wasip2 targets, we use the function pointer directly as the index
     f as usize as Handle
 }

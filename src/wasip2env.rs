@@ -1,3 +1,5 @@
+use crate::FromVal;
+use crate::Val;
 use crate::common::Handle;
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -15,6 +17,10 @@ struct Env;
 impl Guest for Env {
     fn apply(fidx: u32, argv: u32, data: u32) -> u32 {
         unsafe { emlite_env_dyncall_apply(fidx, argv, data) }
+    }
+    fn emlite_target() -> i32 {
+        // Keep in sync with EMLITE_VERSION in emlite-js
+        1037
     }
 }
 
@@ -203,107 +209,40 @@ pub unsafe fn emlite_val_make_callback(fidx: Handle, data: Handle) -> Handle {
     host::emlite_val_make_callback(fidx, data)
 }
 
-// Safer callback management using lazy initialization and proper encapsulation
-use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
-struct CallbackRegistry {
-    callbacks: UnsafeCell<Vec<Option<Box<dyn Fn(Handle, Handle) -> Handle>>>>,
-    initialized: AtomicBool,
-}
-
-// Safety: We ensure thread-safety through proper atomic operations and unsafe cell usage
-unsafe impl Sync for CallbackRegistry {}
-
-static CALLBACK_REGISTRY: CallbackRegistry = CallbackRegistry {
-    callbacks: UnsafeCell::new(Vec::new()),
-    initialized: AtomicBool::new(false),
-};
-
-impl CallbackRegistry {
-    fn ensure_initialized(&self) {
-        if !self.initialized.load(Ordering::Acquire) {
-            // Initialize the vector - safe because we're the first to access it
-            unsafe {
-                (*self.callbacks.get()) = Vec::new();
-            }
-            self.initialized.store(true, Ordering::Release);
-        }
-    }
-    
-    fn register<F>(&self, callback: F) -> Handle
-    where
-        F: Fn(Handle, Handle) -> Handle + 'static,
-    {
-        self.ensure_initialized();
-        
-        let boxed_callback = Box::new(callback);
-        
+// WASI-P2: store callbacks on the JS side.
+// We no longer keep a Rust-side registry; instead, we encode the
+// boxed Rust closure pointer in `data` (via Val::from in Val::make_fn),
+// and dispatch here directly.
+//
+// Note: `fidx` is ignored in this model. JS invokes this export and
+// passes back the original `data` pointer it captured.
+pub unsafe fn emlite_env_dyncall_apply(_fidx: u32, argv: u32, data: u32) -> u32 {
+    // Special-case: argv == 0 means "free" the callback data and drop the closure
+    if argv == 0 {
+        // Reconstruct the pointer from the JS-held handle value
+        let ptr_u = unsafe { emlite_val_get_value_biguint(data) as usize };
+        let ptr = ptr_u as *mut alloc::boxed::Box<dyn FnMut(&[Val]) -> Val>;
+        // Drop the outer box, which drops the boxed closure
         unsafe {
-            let callbacks = &mut *self.callbacks.get();
-            
-            // Find an empty slot or add to the end
-            for (i, slot) in callbacks.iter_mut().enumerate() {
-                if slot.is_none() {
-                    *slot = Some(boxed_callback);
-                    return i as Handle;
-                }
-            }
-            
-            callbacks.push(Some(boxed_callback));
-            (callbacks.len() - 1) as Handle
+            drop(alloc::boxed::Box::from_raw(ptr));
         }
+        // Also release the JS handle holding the pointer value
+        host::emlite_val_dec_ref(data);
+        return 0;
     }
-    
-    fn unregister(&self, fidx: Handle) {
-        if self.initialized.load(Ordering::Acquire) {
-            unsafe {
-                let callbacks = &mut *self.callbacks.get();
-                if (fidx as usize) < callbacks.len() {
-                    // Dropping the boxed callback will properly clean up memory
-                    callbacks[fidx as usize] = None;
-                }
-            }
-        }
-    }
-    
-    // Optional: Clear all callbacks (useful for cleanup or testing)
-    #[allow(dead_code)]
-    fn clear_all(&self) {
-        if self.initialized.load(Ordering::Acquire) {
-            unsafe {
-                let callbacks = &mut *self.callbacks.get();
-                callbacks.clear();
-            }
-        }
-    }
-    
-    fn call(&self, fidx: u32, argv: u32, data: u32) -> u32 {
-        if self.initialized.load(Ordering::Acquire) {
-            unsafe {
-                let callbacks = &*self.callbacks.get();
-                if let Some(Some(callback)) = callbacks.get(fidx as usize) {
-                    return callback(argv, data);
-                }
-            }
-        }
-        0 // Return undefined handle if callback not found
-    }
-}
 
-pub unsafe fn emlite_register_callback<F>(callback: F) -> Handle
-where
-    F: Fn(Handle, Handle) -> Handle + 'static,
-{
-    CALLBACK_REGISTRY.register(callback)
-}
+    // Normal invocation path
+    // Recreate the argument list as Vec<Val>
+    let args_val = Val::take_ownership(argv);
+    let args: alloc::vec::Vec<Val> = args_val.to_vec();
 
-pub unsafe fn emlite_unregister_callback(fidx: Handle) {
-    CALLBACK_REGISTRY.unregister(fidx)
-}
+    // Recover the boxed Rust closure pointer from `data` and call it
+    let ptr_u = unsafe { emlite_val_get_value_biguint(data) as usize };
+    let ptr = ptr_u as *mut alloc::boxed::Box<dyn FnMut(&[Val]) -> Val>;
 
-pub unsafe fn emlite_env_dyncall_apply(fidx: u32, argv: u32, data: u32) -> u32 {
-    CALLBACK_REGISTRY.call(fidx, argv, data)
+    let f: &mut (dyn FnMut(&[Val]) -> Val) = unsafe { &mut **ptr };
+    let ret = f(&args);
+    ret.as_handle()
 }
 
 // Unified interface functions to abstract away wasip2 vs other target differences
@@ -345,4 +284,11 @@ type CallbackFn = fn(Handle, Handle) -> Handle;
 
 pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
     unsafe { emlite_register_callback(f) }
+}
+
+pub unsafe fn emlite_register_callback<F>(_callback: F) -> Handle
+where
+    F: Fn(Handle, Handle) -> Handle + 'static,
+{
+    0
 }

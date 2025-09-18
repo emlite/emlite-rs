@@ -57,6 +57,7 @@ interface host {
 
 interface dyncall {
   apply: func(fidx: u32, argv: u32, data: u32) -> u32;
+  emlite-target: func() -> s32;
 }
 
 world env {
