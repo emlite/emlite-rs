@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
+use alloc::alloc::{dealloc, Layout};
 use core::ptr;
 
 wit_bindgen::generate!({ generate_all });
@@ -19,8 +20,7 @@ impl Guest for Env {
         unsafe { emlite_env_dyncall_apply(fidx, argv, data) }
     }
     fn emlite_target() -> i32 {
-        // Keep in sync with EMLITE_VERSION in emlite-js
-        1037
+        crate::common::emlite_target()
     }
 }
 
@@ -209,40 +209,34 @@ pub unsafe fn emlite_val_make_callback(fidx: Handle, data: Handle) -> Handle {
     host::emlite_val_make_callback(fidx, data)
 }
 
-// WASI-P2: store callbacks on the JS side.
-// We no longer keep a Rust-side registry; instead, we encode the
-// boxed Rust closure pointer in `data` (via Val::from in Val::make_fn),
-// and dispatch here directly.
-//
-// Note: `fidx` is ignored in this model. JS invokes this export and
-// passes back the original `data` pointer it captured.
+// WASI-P2: JS stores callbacks; `data` is a handle to BigInt(pointer to Pack)
+#[repr(C)]
+struct Pack {
+    f: extern "C" fn(Handle, Handle) -> Handle,
+    user_data: Handle, // handle to BigInt(pointer to Box<dyn FnMut>)
+}
+
 pub unsafe fn emlite_env_dyncall_apply(_fidx: u32, argv: u32, data: u32) -> u32 {
-    // Special-case: argv == 0 means "free" the callback data and drop the closure
+    // Decode Pack pointer
+    let pack_ptr_usize = unsafe { emlite_val_get_value_biguint(data) as usize };
+    if pack_ptr_usize == 0 { return 0; }
+    let pack = pack_ptr_usize as *mut Pack;
+    if pack.is_null() { return 0; }
+
     if argv == 0 {
-        // Reconstruct the pointer from the JS-held handle value
-        let ptr_u = unsafe { emlite_val_get_value_biguint(data) as usize };
-        let ptr = ptr_u as *mut alloc::boxed::Box<dyn FnMut(&[Val]) -> Val>;
-        // Drop the outer box, which drops the boxed closure
-        unsafe {
-            drop(alloc::boxed::Box::from_raw(ptr));
-        }
-        // Also release the JS handle holding the pointer value
+        // Finalize: let shim free closure, then cleanup
+        let pack_ref = unsafe { &*pack };
+        (pack_ref.f)(0, pack_ref.user_data);
+        host::emlite_val_dec_ref(pack_ref.user_data);
+        let layout = Layout::new::<Pack>();
+        unsafe { dealloc(pack as *mut u8, layout); }
         host::emlite_val_dec_ref(data);
         return 0;
     }
 
-    // Normal invocation path
-    // Recreate the argument list as Vec<Val>
-    let args_val = Val::take_ownership(argv);
-    let args: alloc::vec::Vec<Val> = args_val.to_vec();
-
-    // Recover the boxed Rust closure pointer from `data` and call it
-    let ptr_u = unsafe { emlite_val_get_value_biguint(data) as usize };
-    let ptr = ptr_u as *mut alloc::boxed::Box<dyn FnMut(&[Val]) -> Val>;
-
-    let f: &mut (dyn FnMut(&[Val]) -> Val) = unsafe { &mut **ptr };
-    let ret = f(&args);
-    ret.as_handle()
+    // Normal invocation: forward to shim with (argv, user_data)
+    let pack_ref = unsafe { &*pack };
+    (pack_ref.f)(argv, pack_ref.user_data)
 }
 
 // Unified interface functions to abstract away wasip2 vs other target differences
@@ -279,13 +273,17 @@ pub unsafe fn emlite_val_not_unified(h: Handle) -> bool {
     unsafe { emlite_val_not(h) }
 }
 
-// Function pointer type for callbacks
-type CallbackFn = fn(Handle, Handle) -> Handle;
+// Function pointer type for callbacks (match C ABI)
+type CallbackFn = extern "C" fn(Handle, Handle) -> Handle;
 
-pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
-    unsafe { emlite_register_callback(f) }
+pub unsafe fn emlite_register_callback_unified(_f: CallbackFn) -> Handle {
+    // WASI-P2 stores callbacks on JS side; no table index is used.
+    0
 }
 
+// For WASI-P2 we don't accept/keep Rust closures in a table; JS holds the
+// callback and we carry the data pointer via BigInt. This stub remains for
+// API parity but is unused.
 pub unsafe fn emlite_register_callback<F>(_callback: F) -> Handle
 where
     F: Fn(Handle, Handle) -> Handle + 'static,

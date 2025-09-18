@@ -1,20 +1,5 @@
 #![allow(unused)]
-use crate::common::Handle;
-
-#[unsafe(no_mangle)]
-#[unsafe(export_name = "emlite_target")]
-pub extern "C" fn emlite_target() -> i32 {
-    1037
-}
-
-#[unsafe(no_mangle)]
-#[unsafe(export_name = "emlite_malloc")]
-pub extern "C" fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void {
-    use core::alloc::Layout;
-    let size = core::cmp::max(sz, 1);
-    let layout = Layout::from_size_align(size, 1).unwrap();
-    unsafe { alloc::alloc::alloc(layout) as _ }
-}
+use crate::common::{Handle, emlite_malloc, emlite_target};
 
 use alloc::alloc::dealloc;
 use core::alloc::Layout;
@@ -152,8 +137,8 @@ pub unsafe fn emlite_val_not_unified(h: Handle) -> bool {
     unsafe { emlite_val_not(h) }
 }
 
-// Function pointer type for callbacks
-type CallbackFn = fn(Handle, Handle) -> Handle;
+// Function pointer type for callbacks (match C ABI for indirect calls)
+type CallbackFn = extern "C" fn(Handle, Handle) -> Handle;
 
 pub unsafe fn emlite_register_callback_unified(f: CallbackFn) -> Handle {
     f as usize as Handle

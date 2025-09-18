@@ -15,7 +15,7 @@ pub mod wasip2env;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 use crate::wasip2env::*;
 
-use crate::common::Handle;
+use crate::common::{Handle, emlite_malloc};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
@@ -207,7 +207,7 @@ impl Val {
     /// Creates a JS function from a function pointer `f` and `data` handle
     /// by packing them into a shared `EmliteCbPack` and returning the JS
     /// function Val. Works across languages in the same module.
-    pub fn make_fn_raw(f: fn(Handle, Handle) -> Handle, data: Handle) -> Val {
+    pub fn make_fn_raw(f: extern "C" fn(Handle, Handle) -> Handle, data: Handle) -> Val {
         let idx = unsafe { emlite_register_callback_unified(f) };
         #[cfg(all(target_os = "wasi", target_env = "p2"))]
         unsafe {
@@ -220,19 +220,17 @@ impl Val {
                 f: extern "C" fn(Handle, Handle) -> Handle,
                 user_data: Handle,
             }
-            unsafe extern "C" {
-                fn emlite_malloc(sz: usize) -> *mut core::ffi::c_void;
-            }
             let pack_ptr = emlite_malloc(core::mem::size_of::<Pack>()) as *mut Pack;
             if pack_ptr.is_null() {
                 // Allocation failure: return undefined
                 return Val::undefined();
             }
-            (*pack_ptr).f = core::mem::transmute(f);
+            (*pack_ptr).f = f;
             (*pack_ptr).user_data = data;
 
             // Pass the pack pointer as a BigInt handle to JS
             let packed_handle = emlite_val_make_biguint(pack_ptr as usize as _);
+            // WASI-P2 WIT expects (fidx, data); fidx is ignored, pass 0
             Val::take_ownership(emlite_val_make_callback(idx, packed_handle))
         }
         #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
@@ -243,7 +241,7 @@ impl Val {
 
     /// Creates a js function from a Rust closure and returns a Val
     pub fn make_fn<F: FnMut(&[Val]) -> Val>(cb: F) -> Val {
-        fn shim(args: Handle, data: Handle) -> Handle {
+        extern "C" fn shim(args: Handle, data: Handle) -> Handle {
             let v = Val::take_ownership(args);
             let vals: Vec<Val> = v.to_vec();
             // data is a handle to a BigInt that encodes the pointer-sized value
