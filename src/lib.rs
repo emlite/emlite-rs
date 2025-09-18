@@ -246,15 +246,16 @@ impl Val {
         fn shim(args: Handle, data: Handle) -> Handle {
             let v = Val::take_ownership(args);
             let vals: Vec<Val> = v.to_vec();
-            let func0 = Val::take_ownership(data);
-            let a = func0.as_::<i32>() as usize as *mut Box<dyn FnMut(&[Val]) -> Val>;
+            // data is a handle to a BigInt that encodes the pointer-sized value
+            let ptr_u = unsafe { emlite_val_get_value_biguint(data) } as usize;
+            let a = ptr_u as *mut Box<dyn FnMut(&[Val]) -> Val>;
             let f: &mut (dyn FnMut(&[Val]) -> Val) = unsafe { &mut **a };
-            core::mem::forget(func0);
             f(&vals).as_handle()
         }
         #[allow(clippy::type_complexity)]
         let a: *mut Box<dyn FnMut(&[Val]) -> Val> = Box::into_raw(Box::new(Box::new(cb)));
-        let data = Val::from(a as Handle);
+        // Store pointer-sized value as BigInt inside a Val
+        let data = Val::from(a as usize);
         unsafe {
             emlite_val_inc_ref(data.as_handle());
         }
