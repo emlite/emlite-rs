@@ -1,5 +1,4 @@
-#![allow(unused)]
-use crate::common::{Handle, emlite_malloc, emlite_target};
+use crate::common::{Handle, emlite_target};
 
 use alloc::alloc::dealloc;
 use core::alloc::Layout;

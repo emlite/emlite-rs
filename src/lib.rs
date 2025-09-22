@@ -15,12 +15,14 @@ pub mod wasip2env;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 use crate::wasip2env::*;
 
-use crate::common::{Handle, emlite_malloc};
+use crate::common::Handle;
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+#[cfg(all(target_os = "wasi", target_env = "p2"))]
+use alloc::alloc::{alloc, Layout};
 use core::ffi::CStr;
 
 #[repr(u32)]
