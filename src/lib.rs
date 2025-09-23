@@ -1,6 +1,7 @@
 #![no_std]
 #![allow(unused_unsafe)]
 #![allow(unused_imports)]
+#![allow(clippy::missing_safety_doc)]
 extern crate alloc;
 
 pub mod common;
@@ -15,14 +16,14 @@ pub mod wasip2env;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 use crate::wasip2env::*;
 
-use crate::common::Handle;
+use crate::common::{EMLITE_TARGET, Handle};
+#[cfg(all(target_os = "wasi", target_env = "p2"))]
+use alloc::alloc::{Layout, alloc};
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
-use alloc::alloc::{alloc, Layout};
 use core::ffi::CStr;
 
 #[repr(u32)]
@@ -59,6 +60,7 @@ macro_rules! argv {
 
 pub fn init() {
     unsafe {
+        assert_eq!(emlite_target(), EMLITE_TARGET);
         emlite_init_handle_table();
     }
 }
@@ -222,7 +224,7 @@ impl Val {
                 f: extern "C" fn(Handle, Handle) -> Handle,
                 user_data: Handle,
             }
-            let pack_ptr = emlite_malloc(core::mem::size_of::<Pack>()) as *mut Pack;
+            let pack_ptr = alloc(Layout::new::<Pack>()) as *mut Pack;
             if pack_ptr.is_null() {
                 // Allocation failure: return undefined
                 return Val::undefined();
@@ -347,6 +349,7 @@ impl Val {
     }
 
     /// Converts UTF-16 Vec<u16> to String, if possible
+    #[allow(clippy::result_unit_err)]
     pub fn utf16_to_string(utf16: &[u16]) -> Result<String, ()> {
         // Simple conversion that works for basic cases
         // For a full implementation, you'd want proper UTF-16 decoding
@@ -1065,13 +1068,8 @@ macro_rules! impl_float {
 impl_float!(f32, f64);
 
 impl FromVal for () {
-    fn from_val(_v: &Val) -> Self {
-        // Unit type doesn't carry any data, so we just return ()
-        ()
-    }
-    fn take_ownership(_v: Handle) -> Self {
-        ()
-    }
+    fn from_val(_v: &Val) -> Self {}
+    fn take_ownership(_v: Handle) -> Self {}
     fn as_handle(&self) -> Handle {
         EmlitePredefHandles::Undefined as u32
     }

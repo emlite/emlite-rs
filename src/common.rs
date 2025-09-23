@@ -1,6 +1,3 @@
 pub type Handle = u32;
 
-#[unsafe(export_name = "emlite_target")]
-pub extern "C" fn emlite_target() -> i32 {
-    1040
-}
+pub(crate) const EMLITE_TARGET: i32 = 1041;

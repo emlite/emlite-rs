@@ -1,11 +1,11 @@
 use crate::FromVal;
 use crate::Val;
 use crate::common::Handle;
+use alloc::alloc::{Layout, dealloc};
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::alloc::{dealloc, Layout};
 use core::ptr;
 
 wit_bindgen::generate!({ generate_all });
@@ -19,14 +19,15 @@ impl Guest for Env {
     fn apply(fidx: u32, argv: u32, data: u32) -> u32 {
         unsafe { emlite_env_dyncall_apply(fidx, argv, data) }
     }
-    fn emlite_target() -> i32 {
-        crate::common::emlite_target()
-    }
 }
 
 export!(Env);
 
 // Adapter functions to bridge WIT bindings with Rust API expectations
+
+pub unsafe fn emlite_target() -> i32 {
+    host::emlite_target()
+}
 
 pub unsafe fn emlite_init_handle_table() {
     host::emlite_init_handle_table();
@@ -219,9 +220,13 @@ struct Pack {
 pub unsafe fn emlite_env_dyncall_apply(_fidx: u32, argv: u32, data: u32) -> u32 {
     // Decode Pack pointer
     let pack_ptr_usize = unsafe { emlite_val_get_value_biguint(data) as usize };
-    if pack_ptr_usize == 0 { return 0; }
+    if pack_ptr_usize == 0 {
+        return 0;
+    }
     let pack = pack_ptr_usize as *mut Pack;
-    if pack.is_null() { return 0; }
+    if pack.is_null() {
+        return 0;
+    }
 
     if argv == 0 {
         // Finalize: let shim free closure, then cleanup
@@ -229,7 +234,9 @@ pub unsafe fn emlite_env_dyncall_apply(_fidx: u32, argv: u32, data: u32) -> u32 
         (pack_ref.f)(0, pack_ref.user_data);
         host::emlite_val_dec_ref(pack_ref.user_data);
         let layout = Layout::new::<Pack>();
-        unsafe { dealloc(pack as *mut u8, layout); }
+        unsafe {
+            dealloc(pack as *mut u8, layout);
+        }
         host::emlite_val_dec_ref(data);
         return 0;
     }

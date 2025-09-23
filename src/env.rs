@@ -1,4 +1,4 @@
-use crate::common::{Handle, emlite_target};
+use crate::common::Handle;
 
 use alloc::alloc::dealloc;
 use core::alloc::Layout;
@@ -67,6 +67,8 @@ unsafe extern "C" {
     pub fn emlite_print_object_map();
 
     pub fn emlite_reset_object_map();
+
+    pub fn emlite_target() -> i32;
 }
 
 // Unified interface functions to abstract away wasip2 vs other target differences

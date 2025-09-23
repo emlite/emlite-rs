@@ -53,11 +53,11 @@ interface host {
   emlite-reset-object-map: func();
 
   emlite-val-make-callback: func(fidx: u32, data: u32) -> u32;
+  emlite-target: func() -> s32;
 }
 
 interface dyncall {
   apply: func(fidx: u32, argv: u32, data: u32) -> u32;
-  emlite-target: func() -> s32;
 }
 
 world env {
