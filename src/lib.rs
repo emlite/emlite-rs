@@ -60,6 +60,7 @@ macro_rules! argv {
 
 pub fn init() {
     unsafe {
+        #[cfg(not(target_os = "emscripten"))]
         assert_eq!(emlite_target(), EMLITE_TARGET);
         emlite_init_handle_table();
     }
