@@ -11,7 +11,11 @@ license = "MIT"
 readme = "README.md"
 
 [target.wasm32-wasip2.dependencies]
-wit-bindgen = "0.44"  
+wit-bindgen = { version = "0.44", optional = true }
 
 [build-dependencies]
 cmk = "0.1"
+
+[features]
+default = ["wasip2-component"]
+wasip2-component = ["wit-bindgen"]

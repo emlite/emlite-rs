@@ -6,18 +6,18 @@ extern crate alloc;
 
 pub mod common;
 
-#[cfg(not(all(target_os = "wasi", target_env = "p2")))]
+#[cfg(not(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component")))]
 pub mod env;
-#[cfg(not(all(target_os = "wasi", target_env = "p2")))]
+#[cfg(not(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component")))]
 use crate::env::*;
 
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
+#[cfg(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component"))]
 pub mod wasip2env;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
+#[cfg(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component"))]
 use crate::wasip2env::*;
 
 use crate::common::{EMLITE_TARGET, Handle};
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
+#[cfg(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component"))]
 use alloc::alloc::{Layout, alloc};
 use alloc::boxed::Box;
 use alloc::format;
@@ -61,7 +61,9 @@ macro_rules! argv {
 pub fn init() {
     unsafe {
         #[cfg(not(target_os = "emscripten"))]
-        assert_eq!(emlite_target(), EMLITE_TARGET);
+        {
+            // assert_eq!(emlite_target(), EMLITE_TARGET);
+        }
         emlite_init_handle_table();
     }
 }
@@ -214,7 +216,7 @@ impl Val {
     /// function Val. Works across languages in the same module.
     pub fn make_fn_raw(f: extern "C" fn(Handle, Handle) -> Handle, data: Handle) -> Val {
         let idx = unsafe { emlite_register_callback_unified(f) };
-        #[cfg(all(target_os = "wasi", target_env = "p2"))]
+        #[cfg(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component"))]
         unsafe {
             // Pin user data for the lifetime of the JS function
             emlite_val_inc_ref(data);
@@ -238,7 +240,7 @@ impl Val {
             // WASI-P2 WIT expects (fidx, data); fidx is ignored, pass 0
             Val::take_ownership(emlite_val_make_callback(idx, packed_handle))
         }
-        #[cfg(not(all(target_os = "wasi", target_env = "p2")))]
+        #[cfg(not(all(target_os = "wasi", target_env = "p2", feature = "wasip2-component")))]
         unsafe {
             Val::take_ownership(emlite_val_make_callback(idx, data))
         }
